@@ -6,13 +6,13 @@ import httpx
 
 app = FastAPI()
 
-GROQ_KEY     = os.getenv("GROQ_API_KEY", "")
-GROQ_URL     = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL   = "llama-3.1-8b-instant"
-SB_URL       = os.getenv("SUPABASE_URL", "")
-SB_KEY       = os.getenv("SUPABASE_KEY", "")
-TG_TOKEN     = os.getenv("TELEGRAM_TOKEN", "")
-TG_URL       = f"https://api.telegram.org/bot{TG_TOKEN}"
+GROQ_KEY  = os.getenv("GROQ_API_KEY", "")
+GROQ_URL  = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_MODEL= "llama-3.1-8b-instant"
+SB_URL    = os.getenv("SUPABASE_URL", "")
+SB_KEY    = os.getenv("SUPABASE_KEY", "")
+TG_TOKEN  = os.getenv("TELEGRAM_TOKEN", "")
+TG_URL    = f"https://api.telegram.org/bot{TG_TOKEN}"
 
 async def tg_send(chat_id: int, texto: str):
     async with httpx.AsyncClient(timeout=10) as c:
@@ -25,8 +25,8 @@ async def sb(method, table, data=None, qs=""):
     if method == "POST": headers["Prefer"] = "return=representation,resolution=merge-duplicates"
     url = f"{SB_URL}/rest/v1/{table}{qs}"
     async with httpx.AsyncClient(timeout=10) as c:
-        if method == "GET":    r = await c.get(url, headers=headers)
-        elif method == "POST": r = await c.post(url, headers=headers, json=data)
+        if method == "GET":      r = await c.get(url, headers=headers)
+        elif method == "POST":   r = await c.post(url, headers=headers, json=data)
         elif method == "DELETE": r = await c.delete(url, headers=headers)
     try: return r.json()
     except: return []
@@ -53,12 +53,14 @@ async def ejecutar(nombre, args):
     hoy = date.today().isoformat()
     if nombre == "agregar_gasto_personal":
         row = {"cat": args.get("cat","otro"), "descripcion": args.get("desc","—"),
-               "monto": float(args.get("monto",0)), "fecha": args.get("fecha",hoy), "nota": args.get("nota","") or ""}
+               "monto": abs(float(args.get("monto", 0))),
+               "fecha": args.get("fecha", hoy), "nota": args.get("nota","") or ""}
         await sb("POST", "gastos_personales", row)
         return f"✅ *{row['descripcion']}* — ${row['monto']:.2f} ({row['cat']}, {row['fecha']})"
     if nombre == "agregar_trading":
         row = {"tipo": args.get("tipo"), "descripcion": args.get("desc","—"),
-               "monto": float(args.get("monto",0)), "fecha": args.get("fecha",hoy), "nota": args.get("nota","") or ""}
+               "monto": abs(float(args.get("monto", 0))),
+               "fecha": args.get("fecha", hoy), "nota": args.get("nota","") or ""}
         await sb("POST", "trading", row)
         return f"{'📈' if row['tipo']=='ganancia' else '📉'} *{row['descripcion']}* — ${row['monto']:.2f} ({row['fecha']})"
     if nombre == "consultar_resumen":
@@ -81,19 +83,30 @@ async def telegram_webhook(req: Request):
         texto   = message.get("text", "").strip()
         if not texto: return JSONResponse({"ok": True})
         if texto == "/start":
-            await tg_send(chat_id, "👋 *Trading Bot activo*\n\n*Ejemplos:*\n• `cena 25 ocio`\n• `alquiler 800 fijo`\n• `ganancia forex 200`\n• `pérdida comisión 15`\n• `resumen del mes`")
+            await tg_send(chat_id,
+                "👋 *Trading Bot activo*\n\n"
+                "*Ejemplos:*\n"
+                "• `cena 25 ocio`\n"
+                "• `alquiler 800 fijo`\n"
+                "• `ganancia forex 200`\n"
+                "• `pérdida comisión 15`\n"
+                "• `resumen del mes`\n"
+                "• `¿cómo voy este mes?`"
+            )
             return JSONResponse({"ok": True})
         ctx = await get_context()
         messages = [
-            {"role":"system","content":f"Eres un asistente financiero. Hoy: {date.today().isoformat()}.\nDatos:\n{ctx}\nSi pide añadir algo usa herramientas. Sé conciso (máx 3 líneas). En español."},
+            {"role":"system","content":f"Eres un asistente financiero. Hoy: {date.today().isoformat()}.\nDatos:\n{ctx}\nSi pide añadir algo usa herramientas. Los montos SIEMPRE positivos. Sé conciso (máx 3 líneas). En español."},
             {"role":"user","content":texto}
         ]
         async with httpx.AsyncClient(timeout=30) as c:
-            r = await c.post(GROQ_URL, headers={"Authorization":f"Bearer {GROQ_KEY}","Content-Type":"application/json"},
+            r = await c.post(GROQ_URL,
+                headers={"Authorization":f"Bearer {GROQ_KEY}","Content-Type":"application/json"},
                 json={"model":GROQ_MODEL,"messages":messages,"tools":TOOLS,"tool_choice":"auto","max_tokens":400})
         choice = r.json()["choices"][0]
         if choice.get("finish_reason") == "tool_calls":
-            partes = [await ejecutar(tc["function"]["name"], json.loads(tc["function"]["arguments"])) for tc in choice["message"]["tool_calls"]]
+            partes = [await ejecutar(tc["function"]["name"], json.loads(tc["function"]["arguments"]))
+                      for tc in choice["message"]["tool_calls"]]
             respuesta = "\n".join(partes)
         else:
             respuesta = choice["message"]["content"].strip()
