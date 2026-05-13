@@ -90,9 +90,33 @@ async def ejecutar(nombre, args):
     return "❌ Herramienta no reconocida."
 
 TOOLS = [
-    {"type":"function","function":{"name":"agregar_gasto_personal","description":"Añade un gasto personal del día a día (comida, alquiler, ocio, ropa, facturas)","parameters":{"type":"object","properties":{"desc":{"type":"string"},"monto":{"type":"number"},"cat":{"type":"string","enum":["fijo","variable","ocio","otro"]},"fecha":{"type":"string"},"nota":{"type":"string"}},"required":["desc","monto","cat"]}}},
-    {"type":"function","function":{"name":"agregar_trading","description":"Añade ganancia o pérdida de trading, broker, pip, trade, stop loss, comisión de broker","parameters":{"type":"object","properties":{"tipo":{"type":"string","enum":["ganancia","gasto"]},"desc":{"type":"string"},"monto":{"type":"number"},"fecha":{"type":"string"},"nota":{"type":"string"}},"required":["tipo","desc","monto"]}}},
-    {"type":"function","function":{"name":"consultar_resumen","description":"Resumen financiero del mes","parameters":{"type":"object","properties":{"mes":{"type":"string"}}}}}
+    {"type":"function","function":{
+        "name":"agregar_gasto_personal",
+        "description":"SOLO para gastos de vida diaria: comida, cena, restaurante, alquiler, hipoteca, luz, agua, gas, internet, ropa, supermercado, farmacia, transporte, gasolina, ocio, viaje, suscripción. NUNCA para pérdidas de trading, broker o inversiones.",
+        "parameters":{"type":"object","properties":{
+            "desc":  {"type":"string"},
+            "monto": {"type":"number","description":"Siempre positivo"},
+            "cat":   {"type":"string","enum":["fijo","variable","ocio","otro"]},
+            "fecha": {"type":"string"},
+            "nota":  {"type":"string"}
+        },"required":["desc","monto","cat"]}
+    }},
+    {"type":"function","function":{
+        "name":"agregar_trading",
+        "description":"SOLO para operaciones financieras: pérdida de broker, ganancia de trading, forex, crypto, acciones, futuros, pip, stop loss, comisión de broker, trade ganado o perdido. NUNCA para gastos de vida diaria.",
+        "parameters":{"type":"object","properties":{
+            "tipo":  {"type":"string","enum":["ganancia","gasto"],"description":"ganancia si es beneficio, gasto si es pérdida"},
+            "desc":  {"type":"string"},
+            "monto": {"type":"number","description":"Siempre positivo"},
+            "fecha": {"type":"string"},
+            "nota":  {"type":"string"}
+        },"required":["tipo","desc","monto"]}
+    }},
+    {"type":"function","function":{
+        "name":"consultar_resumen",
+        "description":"Muestra el resumen financiero del mes",
+        "parameters":{"type":"object","properties":{"mes":{"type":"string"}}}
+    }}
 ]
 
 async def procesar(chat_id: int, texto: str, desde_voz: bool = False):
@@ -108,7 +132,8 @@ async def procesar(chat_id: int, texto: str, desde_voz: bool = False):
     ctx = await get_context()
     messages = [
         {"role":"system","content":(
-            f"Eres un asistente financiero. Hoy: {date.today().isoformat()}.\nDatos:\n{ctx}\n\n"
+            f"Eres un asistente financiero personal. Hoy: {date.today().isoformat()}.\n"
+            f"Datos:\n{ctx}\n\n"
             "REGLAS:\n"
             "- pérdida/broker/trade/operación/stop/pip/comisión broker → agregar_trading tipo=gasto\n"
             "- ganancia/profit/beneficio/trade ganado → agregar_trading tipo=ganancia\n"
