@@ -133,12 +133,14 @@ async def procesar(chat_id: int, texto: str, desde_voz: bool = False):
     messages = [
         {"role":"system","content":(
             f"Eres un asistente financiero personal. Hoy: {date.today().isoformat()}.\n"
-            f"Datos:\n{ctx}\n\n"
-            "REGLAS:\n"
-            "- pérdida/broker/trade/operación/stop/pip/comisión broker → agregar_trading tipo=gasto\n"
-            "- ganancia/profit/beneficio/trade ganado → agregar_trading tipo=ganancia\n"
-            "- cena/comida/alquiler/luz/agua/ropa/ocio/supermercado → agregar_gasto_personal\n"
-            "- Montos SIEMPRE positivos. Sé conciso. En español."
+            f"Datos actuales:\n{ctx}\n\n"
+            "REGLAS IMPORTANTES:\n"
+            "- 'pérdida', 'broker', 'trade', 'operación', 'stop', 'pip', 'comisión broker' → agregar_trading tipo=gasto\n"
+            "- 'ganancia', 'profit', 'beneficio', 'trade ganado' → agregar_trading tipo=ganancia\n"
+            "- 'cena', 'comida', 'alquiler', 'luz', 'agua', 'ropa', 'ocio', 'supermercado' → agregar_gasto_personal\n"
+            "- MONTO: usa EXACTAMENTE el número que aparece en el texto. Si dice 'cine 14' el monto es 14. Si dice '241' el monto es 241. NUNCA cambies ni inventes el número.\n"
+            "- Montos SIEMPRE positivos.\n"
+            "- Sé conciso. En español."
         )},
         {"role":"user","content":texto}
     ]
